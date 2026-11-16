@@ -1,0 +1,6 @@
+{
+  "name": "Nova Salud — Gestión de Botica",
+  "description": "Sistema web fullstack de gestión centralizada de inventario, punto de venta ágil, alertas de reposición y atención al cliente para la Botica Nova Salud.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
