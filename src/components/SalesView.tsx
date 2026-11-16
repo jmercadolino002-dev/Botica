@@ -1,17 +1,24 @@
 import { useMemo, useState } from 'react';
 import { Ban, Download, FileText, Search } from 'lucide-react';
-import { api } from '../lib/api';
 import { downloadCsv, formatCurrency, formatDateTime } from '../lib/format';
-import type { PaymentMethod, Sale, UserRole } from '../shared/types';
+import { pharmacyService } from '../lib/pharmacyService';
+import type { PaymentMethod, Sale, UserProfile, UserRole } from '../shared/types';
 
 interface SalesViewProps {
+  pharmacyId: string;
+  user: UserProfile;
   sales: Sale[];
   userRole: UserRole;
   onSelectSale: (sale: Sale) => void;
-  onRefresh: () => Promise<void>;
 }
 
-export function SalesView({ sales, userRole, onSelectSale, onRefresh }: SalesViewProps) {
+export function SalesView({
+  pharmacyId,
+  user,
+  sales,
+  userRole,
+  onSelectSale,
+}: SalesViewProps) {
   const [query, setQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | PaymentMethod>('all');
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null);
@@ -40,10 +47,14 @@ export function SalesView({ sales, userRole, onSelectSale, onRefresh }: SalesVie
     if (!voidTarget) return;
     setError(null);
     try {
-      await api.voidSale(voidTarget.id, voidReason || 'Anulación autorizada');
+      await pharmacyService.voidSale(
+        pharmacyId,
+        user,
+        voidTarget.id,
+        voidReason || 'Anulación autorizada',
+      );
       setVoidTarget(null);
       setVoidReason('');
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo anular el comprobante.');
     }

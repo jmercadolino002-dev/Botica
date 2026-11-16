@@ -2,15 +2,23 @@ import { useMemo, useState } from 'react';
 import { Download, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { getStaffAvatar } from '../lib/avatars';
 import { downloadCsv, formatDateTime } from '../lib/format';
-import type { AuditLog, UserProfile } from '../shared/types';
+import type { AuditLog, UserProfile, UserRole } from '../shared/types';
 
 interface SecurityAuditViewProps {
   user: UserProfile;
+  effectiveRole: UserRole;
+  onChangePreviewRole: (role: UserRole) => void;
   auditLogs: AuditLog[];
   onSwitchUser: () => void;
 }
 
-export function SecurityAuditView({ user, auditLogs, onSwitchUser }: SecurityAuditViewProps) {
+export function SecurityAuditView({
+  user,
+  effectiveRole,
+  onChangePreviewRole,
+  auditLogs,
+  onSwitchUser,
+}: SecurityAuditViewProps) {
   const [filterAction, setFilterAction] = useState<'all' | 'sales' | 'inventory' | 'auth'>('all');
 
   const filteredLogs = useMemo(() => {
@@ -49,7 +57,7 @@ export function SecurityAuditView({ user, auditLogs, onSwitchUser }: SecurityAud
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-teal-600" />
-              <h2 className="text-sm font-semibold text-slate-900">Sesión Activa y Seguridad</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Sesión Activa en Firebase</h2>
             </div>
             <button
               type="button"
@@ -57,40 +65,54 @@ export function SecurityAuditView({ user, auditLogs, onSwitchUser }: SecurityAud
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 whitespace-nowrap"
             >
               <KeyRound className="h-3.5 w-3.5" />
-              Cambiar Operador
+              Cerrar Sesión
             </button>
           </div>
 
           <div className="mt-4 flex items-center gap-4">
             <img
-              src={getStaffAvatar(user.role)}
+              src={getStaffAvatar(effectiveRole)}
               alt={user.name}
               referrerPolicy="no-referrer"
               className="h-14 w-14 rounded-full object-cover border border-slate-200"
             />
-            <div>
-              <p className="text-sm font-bold text-slate-900">{user.name}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-900 truncate">{user.name}</p>
               <p className="text-xs text-slate-600">
-                {user.title} · <span className="font-mono">{user.cmpOrCode}</span>
+                {effectiveRole === 'admin' ? user.title : 'Técnico en Farmacia'} ·{' '}
+                <span className="font-mono">{user.cmpOrCode}</span>
               </p>
-              <p className="mt-0.5 font-mono text-[11px] text-slate-500">{user.email}</p>
+              <p className="mt-0.5 font-mono text-[11px] text-slate-500 truncate">{user.email}</p>
             </div>
           </div>
 
-          <div className="mt-5 space-y-2 border-t border-slate-100 pt-4 text-xs text-slate-600">
+          <div className="mt-5 space-y-2.5 border-t border-slate-100 pt-4 text-xs text-slate-600">
             <div className="flex items-center justify-between">
-              <span>Cifrado de contraseñas</span>
-              <span className="font-mono font-medium text-slate-900">scrypt + salt único</span>
+              <span>Proveedor de identidad</span>
+              <span className="font-mono font-medium text-slate-900">Google OAuth (Firebase Auth)</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Integridad de sesión</span>
-              <span className="font-mono font-medium text-slate-900">Token HMAC-SHA256</span>
+              <span>Base de datos en la nube</span>
+              <span className="font-mono font-medium text-slate-900">Cloud Firestore · Tiempo Real</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Control de acceso</span>
-              <span className="font-medium text-teal-700">
-                {user.role === 'admin' ? 'Acceso Total (Admin)' : 'Operador de Mostrador'}
-              </span>
+              <span>Modo operativo en interfaz</span>
+              <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                {(['admin', 'seller'] as const).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => onChangePreviewRole(role)}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      effectiveRole === role
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {role === 'admin' ? 'Admin' : 'Vendedor'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -142,7 +164,7 @@ export function SecurityAuditView({ user, auditLogs, onSwitchUser }: SecurityAud
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Bitácora de Auditoría de Datos</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Registro inmutable de movimientos de stock, ventas, ingresos y accesos
+              Registro inmutable en Firestore de movimientos de stock, ventas, ingresos y accesos
             </p>
           </div>
 

@@ -1,13 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Download, Edit3, Plus, Search, SlidersHorizontal } from 'lucide-react';
-import { api } from '../lib/api';
 import { daysUntil, downloadCsv, formatCurrency, formatDateShort } from '../lib/format';
-import type { Product, ProductCategory, UserRole } from '../shared/types';
+import { pharmacyService } from '../lib/pharmacyService';
+import type { Product, ProductCategory, UserProfile, UserRole } from '../shared/types';
 
 interface InventoryViewProps {
+  pharmacyId: string;
+  user: UserProfile;
   products: Product[];
   userRole: UserRole;
-  onRefresh: () => Promise<void>;
 }
 
 type StockFilter = 'all' | 'optimal' | 'low' | 'out' | 'expiring';
@@ -22,7 +23,7 @@ const CATEGORIES: ProductCategory[] = [
   'Primeros Auxilios',
 ];
 
-export function InventoryView({ products, userRole, onRefresh }: InventoryViewProps) {
+export function InventoryView({ pharmacyId, user, products, userRole }: InventoryViewProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StockFilter>('all');
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
@@ -62,7 +63,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
       sku: `MED-${String(products.length + 1).padStart(3, '0')}`,
       name: '',
       activeIngredient: '',
-      laboratory: '',
+      laboratory: 'Genfar',
       category: 'Analgésicos',
       presentation: 'Caja x 10 tabletas',
       batchNumber: 'LOT-26N01',
@@ -90,12 +91,11 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
     setSaving(true);
     try {
       if (isNewProduct) {
-        await api.createProduct(editTarget);
+        await pharmacyService.createProduct(pharmacyId, user, editTarget);
       } else if (editTarget.id) {
-        await api.updateProduct(editTarget.id, editTarget);
+        await pharmacyService.updateProduct(pharmacyId, user, editTarget.id, editTarget);
       }
       setEditTarget(null);
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar producto.');
     } finally {
@@ -112,10 +112,9 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
     const delta = adjustMode === 'add' ? qty : -qty;
     setSaving(true);
     try {
-      await api.adjustStock(adjustTarget.id, delta, adjustReason);
+      await pharmacyService.adjustStock(pharmacyId, user, adjustTarget.id, delta, adjustReason);
       setAdjustTarget(null);
       setAdjustReason('');
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo ajustar el stock.');
     } finally {
@@ -207,7 +206,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
 
       {userRole !== 'admin' && (
         <p className="text-xs text-slate-500">
-          Perfil Técnico en Farmacia: puedes consultar ubicaciones y registrar ajustes operativos de stock. La creación o edición de fichas maestras está reservada para la Química Farmacéutica.
+          Vista Técnico en Farmacia: puedes consultar ubicaciones y registrar ajustes operativos de stock. La creación o edición de fichas maestras corresponde al perfil Química Farmacéutica.
         </p>
       )}
 
@@ -317,7 +316,6 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
         </div>
       </div>
 
-      {/* Modal Ajuste de Stock */}
       {adjustTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
@@ -397,7 +395,6 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
         </div>
       )}
 
-      {/* Modal Crear / Editar Producto */}
       {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -411,6 +408,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                   <label className="block text-xs font-medium text-slate-700">SKU</label>
                   <input
                     required
+                    minLength={2}
                     disabled={!isNewProduct}
                     value={editTarget.sku || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, sku: e.target.value })}
@@ -421,6 +419,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                   <label className="block text-xs font-medium text-slate-700">Nombre comercial</label>
                   <input
                     required
+                    minLength={2}
                     value={editTarget.name || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
@@ -433,6 +432,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                   <label className="block text-xs font-medium text-slate-700">Principio activo</label>
                   <input
                     required
+                    minLength={2}
                     value={editTarget.activeIngredient || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, activeIngredient: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
@@ -460,6 +460,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Laboratorio</label>
                   <input
+                    required
                     value={editTarget.laboratory || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, laboratory: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
@@ -468,6 +469,8 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Presentación</label>
                   <input
+                    required
+                    minLength={2}
                     value={editTarget.presentation || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, presentation: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
@@ -476,6 +479,8 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Ubicación en anaquel</label>
                   <input
+                    required
+                    minLength={2}
                     value={editTarget.location || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, location: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
@@ -536,6 +541,8 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Lote</label>
                   <input
+                    required
+                    minLength={2}
                     value={editTarget.batchNumber || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, batchNumber: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
@@ -545,6 +552,7 @@ export function InventoryView({ products, userRole, onRefresh }: InventoryViewPr
                   <label className="block text-xs font-medium text-slate-700">Fecha de vencimiento</label>
                   <input
                     type="date"
+                    required
                     value={editTarget.expiryDate || ''}
                     onChange={(e) => setEditTarget({ ...editTarget, expiryDate: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"

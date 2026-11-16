@@ -1,6 +1,8 @@
 # Botica Nova Salud — Sistema Web de Gestión de Inventario y Venta
 
-Aplicación web full-stack para la gestión centralizada de inventario farmacéutico, punto de venta ágil (POS), alertas automáticas de reposición, cola de atención al cliente y registro de ventas con trazabilidad y control de acceso por roles.
+Aplicación web para la gestión centralizada de inventario farmacéutico, punto de venta ágil (POS), alertas automáticas de reposición, cola de atención al cliente y registro de ventas con **Firebase Authentication** y **Cloud Firestore** en tiempo real.
+
+Compatible con despliegue estático en **GitHub Pages** sin necesidad de servidor backend propio.
 
 ## Funcionalidades principales
 
@@ -10,39 +12,23 @@ Aplicación web full-stack para la gestión centralizada de inventario farmacéu
 - **Inventario Centralizado**: Control en tiempo real de stock, lote, fecha de vencimiento y stock mínimo, con ajustes auditados y exportación a CSV.
 - **Alertas de Reposición**: Detección automática de productos agotados, con stock bajo o próximos a vencer, generación de órdenes de reposición y confirmación de ingreso a almacén.
 - **Registro de Ventas**: Historial de comprobantes, visualización/impresión, exportación a CSV y anulación autorizada con restitución automática de stock.
-- **Seguridad y Auditoría**: Contraseñas cifradas con `scrypt`, tokens de sesión firmados con `HMAC-SHA256`, control de acceso por roles (`Química Farmacéutica` / `Técnico en Farmacia`) y bitácora de auditoría.
+- **Seguridad y Auditoría**: Inicio de sesión con Google (Firebase Auth), reglas de seguridad Firestore (`firestore.rules`) y bitácora inmutable de auditoría.
 
 ## Stack tecnológico
 
-- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Lucide Icons
-- **Backend**: Node.js, Express 4, TSX
-- **Persistencia**: Archivo transaccional local en `data/novasalud-db.json` (autogenerado con datos iniciales al arrancar)
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Lucide Icons, Vite
+- **Backend / Nube**: Firebase Authentication (Google Sign-In) + Cloud Firestore
 
-## Instalación y ejecución local
+## Ejecución local
 
-1. Instalar dependencias:
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+npm run dev
+```
 
-2. (Opcional) Configurar variables de entorno copiando `.env.example` a `.env`:
-   ```bash
-   cp .env.example .env
-   ```
+## Publicación en GitHub Pages
 
-3. Ejecutar en modo desarrollo (servidor Express + Vite):
-   ```bash
-   npm run dev
-   ```
-   Abrir en el navegador: `http://localhost:3000`
-
-4. Compilar y ejecutar en producción:
-   ```bash
-   npm run build
-   npm start
-   ```
-
-## Cuentas de acceso (demo)
-
-- **Química Farmacéutica (Admin)**: `admin@novasalud.pe` / `NovaAdmin2026!`
-- **Técnico en Farmacia (Vendedor)**: `ventas@novasalud.pe` / `NovaVentas2026!`
+El repositorio incluye el workflow `.github/workflows/deploy.yml`.
+1. Sube los cambios a la rama `main` de tu repositorio en GitHub.
+2. En GitHub, ve a **Settings → Pages → Build and deployment → Source** y selecciona **GitHub Actions**.
+3. En **Firebase Console → Authentication → Settings → Authorized domains**, agrega tu dominio `TU_USUARIO.github.io` para permitir el inicio de sesión con Google desde GitHub Pages.

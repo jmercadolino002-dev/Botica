@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Minus, Plus, Search, ShoppingBag, Trash2, UserPlus, X } from 'lucide-react';
-import { api } from '../lib/api';
 import { formatCurrency } from '../lib/format';
+import { pharmacyService } from '../lib/pharmacyService';
 import type {
   Customer,
   PaymentMethod,
@@ -10,15 +10,17 @@ import type {
   QueueTicket,
   ReceiptType,
   Sale,
+  UserProfile,
 } from '../shared/types';
 
 interface PosViewProps {
+  pharmacyId: string;
+  user: UserProfile;
   products: Product[];
   customers: Customer[];
   activeTicket: QueueTicket | null;
   onClearActiveTicket: () => void;
   onSaleCompleted: (sale: Sale) => void;
-  onCustomerCreated: (customer: Customer) => void;
 }
 
 interface CartItem {
@@ -38,12 +40,13 @@ const CATEGORIES: ('Todos' | ProductCategory)[] = [
 ];
 
 export function PosView({
+  pharmacyId,
+  user,
   products,
   customers,
   activeTicket,
   onClearActiveTicket,
   onSaleCompleted,
-  onCustomerCreated,
 }: PosViewProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'Todos' | ProductCategory>('Todos');
@@ -59,7 +62,6 @@ export function PosView({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Quick customer registration inline modal
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustName, setNewCustName] = useState('');
   const [newCustDoc, setNewCustDoc] = useState('');
@@ -185,7 +187,7 @@ export function PosView({
 
     setSubmitting(true);
     try {
-      const res = await api.createSale({
+      const sale = await pharmacyService.createSale(pharmacyId, user, {
         receiptType,
         customerId: selectedCustomer ? selectedCustomer.id : null,
         customerName: selectedCustomer ? selectedCustomer.fullName : walkInName,
@@ -208,7 +210,7 @@ export function PosView({
       setAmountTendered('');
       setPrescriptionVerified(false);
       onClearActiveTicket();
-      onSaleCompleted(res.sale);
+      onSaleCompleted(sale);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo procesar la venta.');
     } finally {
@@ -217,17 +219,19 @@ export function PosView({
   }
 
   async function handleQuickCreateCustomer() {
-    if (!newCustName.trim() || !newCustDoc.trim()) return;
+    if (!newCustName.trim() || newCustDoc.trim().length < 5) {
+      setError('Ingresa nombre completo y documento (mínimo 5 caracteres).');
+      return;
+    }
     try {
-      const res = await api.createCustomer({
+      const customer = await pharmacyService.createCustomer(pharmacyId, user, {
         documentType: newCustDoc.trim().length === 11 ? 'RUC' : 'DNI',
         documentNumber: newCustDoc.trim(),
         fullName: newCustName.trim(),
         phone: newCustPhone.trim(),
         allergies: newCustAllergy.trim() || 'Ninguna conocida',
       });
-      onCustomerCreated(res.customer);
-      setSelectedCustomerId(res.customer.id);
+      setSelectedCustomerId(customer.id);
       setShowNewCustomer(false);
       setNewCustName('');
       setNewCustDoc('');
@@ -240,7 +244,6 @@ export function PosView({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      {/* Catálogo rápido */}
       <div className="space-y-4 lg:col-span-7 xl:col-span-8">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -376,7 +379,6 @@ export function PosView({
         </div>
       </div>
 
-      {/* Panel de cobro y atención */}
       <aside className="lg:col-span-5 xl:col-span-4">
         <div className="sticky top-6 rounded-xl border border-slate-200 bg-white p-5 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -408,7 +410,6 @@ export function PosView({
             </div>
           )}
 
-          {/* Cliente */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label htmlFor="pos-customer" className="text-xs font-medium text-slate-700">
@@ -486,16 +487,18 @@ export function PosView({
                     </option>
                   ))}
                 </select>
-                {selectedCustomer && selectedCustomer.allergies && selectedCustomer.allergies !== 'Ninguna conocida' && selectedCustomer.allergies !== 'No aplica' && (
-                  <p className="text-[11px] font-medium text-amber-700">
-                    Alerta clínica: Alergia registrada a {selectedCustomer.allergies}
-                  </p>
-                )}
+                {selectedCustomer &&
+                  selectedCustomer.allergies &&
+                  selectedCustomer.allergies !== 'Ninguna conocida' &&
+                  selectedCustomer.allergies !== 'No aplica' && (
+                    <p className="text-[11px] font-medium text-amber-700">
+                      Alerta clínica: Alergia registrada a {selectedCustomer.allergies}
+                    </p>
+                  )}
               </>
             )}
           </div>
 
-          {/* Carrito */}
           <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border-y border-slate-200 py-1">
             {cart.length === 0 ? (
               <p className="py-8 text-center text-xs text-slate-400">
@@ -559,7 +562,6 @@ export function PosView({
             </label>
           )}
 
-          {/* Tipo de comprobante y pago */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <span className="block text-[11px] font-medium text-slate-500">Comprobante</span>
@@ -635,7 +637,6 @@ export function PosView({
             </div>
           )}
 
-          {/* Totales */}
           <div className="space-y-1.5 border-t border-slate-200 pt-3 text-xs">
             <div className="flex justify-between text-slate-500">
               <span>Op. Gravada</span>

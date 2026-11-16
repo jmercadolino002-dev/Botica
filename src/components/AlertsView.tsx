@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react';
 import { CheckCircle2, PackagePlus, Truck } from 'lucide-react';
-import { api } from '../lib/api';
 import { formatCurrency, formatDateShort, formatDateTime } from '../lib/format';
-import type { InventoryAlert, RestockOrder } from '../shared/types';
+import { pharmacyService } from '../lib/pharmacyService';
+import type { InventoryAlert, Product, RestockOrder, UserProfile } from '../shared/types';
 
 interface AlertsViewProps {
+  pharmacyId: string;
+  user: UserProfile;
+  products: Product[];
   alerts: InventoryAlert[];
   restockOrders: RestockOrder[];
-  onRefresh: () => Promise<void>;
 }
 
 const SUPPLIERS = [
@@ -16,7 +18,13 @@ const SUPPLIERS = [
   'Alfaro Salud S.A.C.',
 ];
 
-export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps) {
+export function AlertsView({
+  pharmacyId,
+  user,
+  products,
+  alerts,
+  restockOrders,
+}: AlertsViewProps) {
   const [selectedIds, setSelectedIds] = useState<Record<string, number>>({});
   const [supplier, setSupplier] = useState(SUPPLIERS[0]);
   const [submittingOrder, setSubmittingOrder] = useState(false);
@@ -66,9 +74,8 @@ export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps
 
     setSubmittingOrder(true);
     try {
-      await api.createRestockOrder(supplier, items);
+      await pharmacyService.createRestockOrder(pharmacyId, user, supplier, items, products);
       setSelectedIds({});
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo generar la orden de reposición.');
     } finally {
@@ -81,9 +88,14 @@ export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps
     if (!receiveTarget) return;
     setError(null);
     try {
-      await api.receiveRestockOrder(receiveTarget.id, batchNumber, expiryDate);
+      await pharmacyService.receiveRestockOrder(
+        pharmacyId,
+        user,
+        receiveTarget.id,
+        batchNumber,
+        expiryDate,
+      );
       setReceiveTarget(null);
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al confirmar recepción.');
     }
@@ -131,7 +143,6 @@ export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Lista de alertas de reposición */}
         <section className="rounded-xl border border-slate-200 bg-white lg:col-span-8">
           <div className="flex flex-col justify-between gap-3 border-b border-slate-200 px-6 py-4 sm:flex-row sm:items-center">
             <div>
@@ -244,7 +255,6 @@ export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps
           )}
         </section>
 
-        {/* Generador de Orden de Reposición */}
         <aside className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-4 h-fit">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Truck className="h-4 w-4 text-teal-600" />
@@ -297,7 +307,6 @@ export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps
         </aside>
       </div>
 
-      {/* Historial de órdenes de reposición */}
       <section className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div className="border-b border-slate-200 px-6 py-4">
           <h2 className="text-sm font-semibold text-slate-900">Órdenes de Reposición a Droguería</h2>
@@ -376,6 +385,7 @@ export function AlertsView({ alerts, restockOrders, onRefresh }: AlertsViewProps
                 <label className="block text-xs font-medium text-slate-700">Lote de ingreso</label>
                 <input
                   required
+                  minLength={2}
                   value={batchNumber}
                   onChange={(e) => setBatchNumber(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"

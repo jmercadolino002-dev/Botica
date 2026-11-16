@@ -1,20 +1,22 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowRight, Clock, Plus, Search, UserPlus } from 'lucide-react';
-import { api } from '../lib/api';
 import { formatCurrency, minutesSince } from '../lib/format';
-import type { Customer, QueueServiceType, QueueTicket } from '../shared/types';
+import { pharmacyService } from '../lib/pharmacyService';
+import type { Customer, QueueServiceType, QueueTicket, UserProfile } from '../shared/types';
 
 interface QueueAndClientsViewProps {
+  pharmacyId: string;
+  user: UserProfile;
   queue: QueueTicket[];
   customers: Customer[];
-  onRefresh: () => Promise<void>;
   onAttendInPos: (ticket: QueueTicket) => void;
 }
 
 export function QueueAndClientsView({
+  pharmacyId,
+  user,
   queue,
   customers,
-  onRefresh,
   onAttendInPos,
 }: QueueAndClientsViewProps) {
   const [customerName, setCustomerName] = useState('');
@@ -55,7 +57,7 @@ export function QueueAndClientsView({
     setSubmittingTurn(true);
     try {
       const matched = customers.find((c) => c.documentNumber === documentNumber.trim());
-      await api.createQueueTicket({
+      await pharmacyService.createQueueTicket(pharmacyId, user, {
         customerId: matched?.id || null,
         customerName: matched ? matched.fullName : customerName,
         documentNumber: documentNumber || 'Sin documento',
@@ -64,7 +66,6 @@ export function QueueAndClientsView({
       });
       setCustomerName('');
       setDocumentNumber('');
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo generar el turno.');
     } finally {
@@ -74,22 +75,20 @@ export function QueueAndClientsView({
 
   async function handleAttend(ticket: QueueTicket) {
     if (ticket.status === 'En espera') {
-      await api.updateQueueStatus(ticket.id, 'En atención');
-      await onRefresh();
+      await pharmacyService.updateQueueStatus(pharmacyId, user, ticket.id, 'En atención');
     }
     onAttendInPos(ticket);
   }
 
   async function handleMarkDone(ticketId: string) {
-    await api.updateQueueStatus(ticketId, 'Atendido');
-    await onRefresh();
+    await pharmacyService.updateQueueStatus(pharmacyId, user, ticketId, 'Atendido');
   }
 
   async function handleCreateCustomer(e: FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await api.createCustomer(newClient);
+      await pharmacyService.createCustomer(pharmacyId, user, newClient);
       setShowClientModal(false);
       setNewClient({
         documentType: 'DNI',
@@ -100,7 +99,6 @@ export function QueueAndClientsView({
         allergies: '',
         notes: '',
       });
-      await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrar cliente.');
     }
@@ -109,7 +107,6 @@ export function QueueAndClientsView({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Registro de turno */}
         <section className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-4">
           <h2 className="text-sm font-semibold text-slate-900">Registrar Turno en Mostrador</h2>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -144,6 +141,7 @@ export function QueueAndClientsView({
                 id="turn-name"
                 type="text"
                 required
+                minLength={2}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Nombre y apellido"
@@ -198,7 +196,6 @@ export function QueueAndClientsView({
           </form>
         </section>
 
-        {/* Cola activa */}
         <section className="rounded-xl border border-slate-200 bg-white lg:col-span-8">
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <div>
@@ -285,7 +282,6 @@ export function QueueAndClientsView({
         </section>
       </div>
 
-      {/* Directorio de clientes */}
       <section className="rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col justify-between gap-3 border-b border-slate-200 px-6 py-4 sm:flex-row sm:items-center">
           <div>
@@ -389,6 +385,7 @@ export function QueueAndClientsView({
                   <label className="block text-xs font-medium text-slate-700">Número</label>
                   <input
                     required
+                    minLength={5}
                     value={newClient.documentNumber}
                     onChange={(e) => setNewClient({ ...newClient, documentNumber: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
@@ -399,6 +396,7 @@ export function QueueAndClientsView({
                 <label className="block text-xs font-medium text-slate-700">Nombre completo / Razón social</label>
                 <input
                   required
+                  minLength={2}
                   value={newClient.fullName}
                   onChange={(e) => setNewClient({ ...newClient, fullName: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"

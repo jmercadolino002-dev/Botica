@@ -1,0 +1,234 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Public display identity and role title for a pharmacy operator.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "roleTitle": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "role": { "type": "string", "enum": ["admin", "seller"] },
+        "cmpOrCode": { "type": "string", "minLength": 2, "maxLength": 32 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "roleTitle", "role", "cmpOrCode", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Private contact details (PII) isolated from public profile reads.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "pharmacyId", "updatedAt"]
+    },
+    "Pharmacy": {
+      "title": "Pharmacy",
+      "description": "Root pharmacy workspace tenant owning inventory, sales, customers, queue, and audit records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "ruc": { "type": "string", "minLength": 11, "maxLength": 11 },
+        "address": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "receiptCounter": { "type": "number" },
+        "facturaCounter": { "type": "number" },
+        "queueCounter": { "type": "number" },
+        "restockCounter": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "ruc", "address", "ownerId", "receiptCounter", "facturaCounter", "queueCounter", "restockCounter", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Pharmaceutical product tracked in real-time pharmacy inventory.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sku": { "type": "string", "minLength": 2, "maxLength": 40 },
+        "barcode": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "activeIngredient": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "laboratory": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "category": { "type": "string", "enum": ["Analgésicos", "Antibióticos", "Respiratorio", "Vitaminas", "Digestivo", "Dermocosmética", "Primeros Auxilios"] },
+        "presentation": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "batchNumber": { "type": "string", "minLength": 2, "maxLength": 50 },
+        "expiryDate": { "type": "string", "minLength": 10, "maxLength": 10 },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "optimalStock": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "salePrice": { "type": "number" },
+        "requiresPrescription": { "type": "boolean" },
+        "location": { "type": "string", "minLength": 2, "maxLength": 50 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pharmacyId", "ownerId", "sku", "barcode", "name", "activeIngredient", "laboratory", "category", "presentation", "batchNumber", "expiryDate", "stock", "minStock", "optimalStock", "costPrice", "salePrice", "requiresPrescription", "location", "createdAt", "updatedAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Registered pharmacy customer with document, allergies, and purchase totals.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "documentType": { "type": "string", "enum": ["DNI", "RUC", "CE"] },
+        "documentNumber": { "type": "string", "minLength": 5, "maxLength": 20 },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 140 },
+        "allergies": { "type": "string", "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 300 },
+        "visitsCount": { "type": "number" },
+        "totalSpent": { "type": "number" },
+        "lastVisit": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pharmacyId", "ownerId", "documentType", "documentNumber", "fullName", "phone", "email", "allergies", "notes", "visitsCount", "totalSpent", "lastVisit", "createdAt", "updatedAt"]
+    },
+    "QueueTicket": {
+      "title": "QueueTicket",
+      "description": "Counter customer queue turn ticket.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketCode": { "type": "string", "minLength": 2, "maxLength": 20 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "documentNumber": { "type": "string", "maxLength": 30 },
+        "serviceType": { "type": "string", "enum": ["Atención Rápida", "Receta Médica", "Consulta Farmacéutica"] },
+        "priority": { "type": "string", "enum": ["Normal", "Preferencial"] },
+        "status": { "type": "string", "enum": ["En espera", "En atención", "Atendido"] },
+        "startedAt": { "type": "string", "maxLength": 40 },
+        "completedAt": { "type": "string", "maxLength": 40 },
+        "assignedUserName": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pharmacyId", "ownerId", "ticketCode", "customerName", "documentNumber", "serviceType", "priority", "status", "createdAt", "updatedAt"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Completed or voided pharmacy sales receipt (Boleta/Factura).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "receiptNumber": { "type": "string", "minLength": 4, "maxLength": 30 },
+        "receiptType": { "type": "string", "enum": ["Boleta", "Factura"] },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "customerDocument": { "type": "string", "minLength": 4, "maxLength": 20 },
+        "sellerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "sellerName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "igv": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Efectivo", "Tarjeta", "Yape / Plin"] },
+        "amountTendered": { "type": "number" },
+        "changeDue": { "type": "number" },
+        "prescriptionVerified": { "type": "boolean" },
+        "queueTicketId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["Completada", "Anulada"] },
+        "voidReason": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pharmacyId", "ownerId", "receiptNumber", "receiptType", "customerName", "customerDocument", "sellerId", "sellerName", "items", "subtotal", "igv", "discount", "total", "paymentMethod", "amountTendered", "changeDue", "prescriptionVerified", "status", "createdAt", "updatedAt"]
+    },
+    "RestockOrder": {
+      "title": "RestockOrder",
+      "description": "Supplier replenishment purchase order and receipt confirmation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderCode": { "type": "string", "minLength": 4, "maxLength": 30 },
+        "supplier": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "status": { "type": "string", "enum": ["Pendiente", "Recibida"] },
+        "items": { "type": "array" },
+        "totalEstimatedCost": { "type": "number" },
+        "createdBy": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "receivedAt": { "type": "string", "maxLength": 40 },
+        "receivedBy": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pharmacyId", "ownerId", "orderCode", "supplier", "status", "items", "totalEstimatedCost", "createdBy", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable operational and security audit log entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "pharmacyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "timestamp": { "type": "string", "maxLength": 40 },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "userName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "userRole": { "type": "string", "enum": ["admin", "seller"] },
+        "action": { "type": "string", "minLength": 3, "maxLength": 40 },
+        "detail": { "type": "string", "minLength": 3, "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pharmacyId", "ownerId", "timestamp", "userId", "userName", "userRole", "action", "detail", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/public/{docId}": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Public operator profile separated from PII."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Private operator email and workspace pointer restricted to owner/admin."
+    },
+    "/pharmacies/{pharmacyId}": {
+      "schema": { "$ref": "#/entities/Pharmacy" },
+      "description": "Root pharmacy workspace document."
+    },
+    "/pharmacies/{pharmacyId}/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Pharmaceutical inventory items scoped to pharmacy workspace."
+    },
+    "/pharmacies/{pharmacyId}/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer directory scoped to pharmacy workspace."
+    },
+    "/pharmacies/{pharmacyId}/queue/{ticketId}": {
+      "schema": { "$ref": "#/entities/QueueTicket" },
+      "description": "Counter customer queue tickets."
+    },
+    "/pharmacies/{pharmacyId}/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "Electronic sales receipts (Boleta/Factura)."
+    },
+    "/pharmacies/{pharmacyId}/restockOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/RestockOrder" },
+      "description": "Supplier replenishment purchase orders."
+    },
+    "/pharmacies/{pharmacyId}/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Append-only operational audit logs."
+    }
+  }
+}

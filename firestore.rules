@@ -1,0 +1,403 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'jmercadolino002@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isPharmacyOwner(pharmacyId) {
+      return isVerifiedUser() && (
+        isBootstrappedAdmin() ||
+        get(/databases/$(database)/documents/pharmacies/$(pharmacyId)).data.ownerId == request.auth.uid
+      );
+    }
+
+    // Validation Helpers
+    function isValidUserPublic(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'roleTitle', 'role', 'cmpOrCode', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'roleTitle', 'role', 'cmpOrCode', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 100 &&
+        data.roleTitle is string && data.roleTitle.size() >= 2 && data.roleTitle.size() <= 80 &&
+        data.role in ['admin', 'seller'] &&
+        data.cmpOrCode is string && data.cmpOrCode.size() >= 2 && data.cmpOrCode.size() <= 32 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivate(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'pharmacyId', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'pharmacyId', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 160 &&
+        isValidId(data.pharmacyId) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPharmacy(data, pharmacyId) {
+      return data.keys().hasAll(['id', 'name', 'ruc', 'address', 'ownerId', 'receiptCounter', 'facturaCounter', 'queueCounter', 'restockCounter', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'name', 'ruc', 'address', 'ownerId', 'receiptCounter', 'facturaCounter', 'queueCounter', 'restockCounter', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.id == pharmacyId &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.ruc is string && data.ruc.size() == 11 &&
+        data.address is string && data.address.size() >= 3 && data.address.size() <= 200 &&
+        isValidId(data.ownerId) &&
+        data.receiptCounter is number && data.receiptCounter >= 0 &&
+        data.facturaCounter is number && data.facturaCounter >= 0 &&
+        data.queueCounter is number && data.queueCounter >= 0 &&
+        data.restockCounter is number && data.restockCounter >= 0 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidProduct(data, pharmacyId, productId) {
+      return data.keys().hasAll(['id', 'pharmacyId', 'ownerId', 'sku', 'barcode', 'name', 'activeIngredient', 'laboratory', 'category', 'presentation', 'batchNumber', 'expiryDate', 'stock', 'minStock', 'optimalStock', 'costPrice', 'salePrice', 'requiresPrescription', 'location', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'pharmacyId', 'ownerId', 'sku', 'barcode', 'name', 'activeIngredient', 'laboratory', 'category', 'presentation', 'batchNumber', 'expiryDate', 'stock', 'minStock', 'optimalStock', 'costPrice', 'salePrice', 'requiresPrescription', 'location', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) && data.id == productId &&
+        isValidId(data.pharmacyId) && data.pharmacyId == pharmacyId &&
+        isValidId(data.ownerId) &&
+        data.sku is string && data.sku.size() >= 2 && data.sku.size() <= 40 &&
+        data.barcode is string && data.barcode.size() >= 4 && data.barcode.size() <= 40 &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 140 &&
+        data.activeIngredient is string && data.activeIngredient.size() >= 2 && data.activeIngredient.size() <= 140 &&
+        data.laboratory is string && data.laboratory.size() >= 1 && data.laboratory.size() <= 80 &&
+        data.category in ['Analgésicos', 'Antibióticos', 'Respiratorio', 'Vitaminas', 'Digestivo', 'Dermocosmética', 'Primeros Auxilios'] &&
+        data.presentation is string && data.presentation.size() >= 2 && data.presentation.size() <= 100 &&
+        data.batchNumber is string && data.batchNumber.size() >= 2 && data.batchNumber.size() <= 50 &&
+        data.expiryDate is string && data.expiryDate.size() == 10 &&
+        data.stock is number && data.stock >= 0 &&
+        data.minStock is number && data.minStock >= 1 &&
+        data.optimalStock is number && data.optimalStock >= 1 &&
+        data.costPrice is number && data.costPrice > 0 &&
+        data.salePrice is number && data.salePrice > 0 &&
+        data.requiresPrescription is bool &&
+        data.location is string && data.location.size() >= 2 && data.location.size() <= 50 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCustomer(data, pharmacyId, customerId) {
+      return data.keys().hasAll(['id', 'pharmacyId', 'ownerId', 'documentType', 'documentNumber', 'fullName', 'phone', 'email', 'allergies', 'notes', 'visitsCount', 'totalSpent', 'lastVisit', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'pharmacyId', 'ownerId', 'documentType', 'documentNumber', 'fullName', 'phone', 'email', 'allergies', 'notes', 'visitsCount', 'totalSpent', 'lastVisit', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) && data.id == customerId &&
+        isValidId(data.pharmacyId) && data.pharmacyId == pharmacyId &&
+        isValidId(data.ownerId) &&
+        data.documentType in ['DNI', 'RUC', 'CE'] &&
+        data.documentNumber is string && data.documentNumber.size() >= 5 && data.documentNumber.size() <= 20 &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 140 &&
+        data.phone is string && data.phone.size() <= 30 &&
+        data.email is string && data.email.size() <= 140 &&
+        data.allergies is string && data.allergies.size() <= 200 &&
+        data.notes is string && data.notes.size() <= 300 &&
+        data.visitsCount is number && data.visitsCount >= 0 &&
+        data.totalSpent is number && data.totalSpent >= 0 &&
+        data.lastVisit is string && data.lastVisit.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidQueueTicket(data, pharmacyId, ticketId) {
+      return data.keys().hasAll(['id', 'pharmacyId', 'ownerId', 'ticketCode', 'customerName', 'documentNumber', 'serviceType', 'priority', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'pharmacyId', 'ownerId', 'ticketCode', 'customerId', 'customerName', 'documentNumber', 'serviceType', 'priority', 'status', 'startedAt', 'completedAt', 'assignedUserName', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) && data.id == ticketId &&
+        isValidId(data.pharmacyId) && data.pharmacyId == pharmacyId &&
+        isValidId(data.ownerId) &&
+        data.ticketCode is string && data.ticketCode.size() >= 2 && data.ticketCode.size() <= 20 &&
+        (!('customerId' in data) || data.customerId == null || (data.customerId is string && data.customerId.size() <= 128)) &&
+        data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 140 &&
+        data.documentNumber is string && data.documentNumber.size() <= 30 &&
+        data.serviceType in ['Atención Rápida', 'Receta Médica', 'Consulta Farmacéutica'] &&
+        data.priority in ['Normal', 'Preferencial'] &&
+        data.status in ['En espera', 'En atención', 'Atendido'] &&
+        (!('startedAt' in data) || data.startedAt == null || (data.startedAt is string && data.startedAt.size() <= 40)) &&
+        (!('completedAt' in data) || data.completedAt == null || (data.completedAt is string && data.completedAt.size() <= 40)) &&
+        (!('assignedUserName' in data) || data.assignedUserName == null || (data.assignedUserName is string && data.assignedUserName.size() <= 120)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSale(data, pharmacyId, saleId) {
+      return data.keys().hasAll(['id', 'pharmacyId', 'ownerId', 'receiptNumber', 'receiptType', 'customerName', 'customerDocument', 'sellerId', 'sellerName', 'items', 'subtotal', 'igv', 'discount', 'total', 'paymentMethod', 'amountTendered', 'changeDue', 'prescriptionVerified', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'pharmacyId', 'ownerId', 'receiptNumber', 'receiptType', 'customerId', 'customerName', 'customerDocument', 'sellerId', 'sellerName', 'items', 'subtotal', 'igv', 'discount', 'total', 'paymentMethod', 'amountTendered', 'changeDue', 'prescriptionVerified', 'queueTicketId', 'status', 'voidReason', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) && data.id == saleId &&
+        isValidId(data.pharmacyId) && data.pharmacyId == pharmacyId &&
+        isValidId(data.ownerId) &&
+        data.receiptNumber is string && data.receiptNumber.size() >= 4 && data.receiptNumber.size() <= 30 &&
+        data.receiptType in ['Boleta', 'Factura'] &&
+        (!('customerId' in data) || data.customerId == null || (data.customerId is string && data.customerId.size() <= 128)) &&
+        data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 140 &&
+        data.customerDocument is string && data.customerDocument.size() >= 4 && data.customerDocument.size() <= 20 &&
+        isValidId(data.sellerId) &&
+        data.sellerName is string && data.sellerName.size() >= 2 && data.sellerName.size() <= 120 &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 25 && data.items[0] is map &&
+        data.subtotal is number && data.subtotal >= 0 &&
+        data.igv is number && data.igv >= 0 &&
+        data.discount is number && data.discount >= 0 &&
+        data.total is number && data.total >= 0 &&
+        data.paymentMethod in ['Efectivo', 'Tarjeta', 'Yape / Plin'] &&
+        data.amountTendered is number && data.amountTendered >= 0 &&
+        data.changeDue is number && data.changeDue >= 0 &&
+        data.prescriptionVerified is bool &&
+        (!('queueTicketId' in data) || data.queueTicketId == null || (data.queueTicketId is string && data.queueTicketId.size() <= 128)) &&
+        data.status in ['Completada', 'Anulada'] &&
+        (!('voidReason' in data) || (data.voidReason is string && data.voidReason.size() <= 200)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRestockOrder(data, pharmacyId, orderId) {
+      return data.keys().hasAll(['id', 'pharmacyId', 'ownerId', 'orderCode', 'supplier', 'status', 'items', 'totalEstimatedCost', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'pharmacyId', 'ownerId', 'orderCode', 'supplier', 'status', 'items', 'totalEstimatedCost', 'createdBy', 'receivedAt', 'receivedBy', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) && data.id == orderId &&
+        isValidId(data.pharmacyId) && data.pharmacyId == pharmacyId &&
+        isValidId(data.ownerId) &&
+        data.orderCode is string && data.orderCode.size() >= 4 && data.orderCode.size() <= 30 &&
+        data.supplier is string && data.supplier.size() >= 2 && data.supplier.size() <= 140 &&
+        data.status in ['Pendiente', 'Recibida'] &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 30 && data.items[0] is map &&
+        data.totalEstimatedCost is number && data.totalEstimatedCost >= 0 &&
+        data.createdBy is string && data.createdBy.size() >= 2 && data.createdBy.size() <= 120 &&
+        (!('receivedAt' in data) || data.receivedAt == null || (data.receivedAt is string && data.receivedAt.size() <= 40)) &&
+        (!('receivedBy' in data) || data.receivedBy == null || (data.receivedBy is string && data.receivedBy.size() <= 120)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data, pharmacyId, logId) {
+      return data.keys().hasAll(['id', 'pharmacyId', 'ownerId', 'timestamp', 'userId', 'userName', 'userRole', 'action', 'detail', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'pharmacyId', 'ownerId', 'timestamp', 'userId', 'userName', 'userRole', 'action', 'detail', 'createdAt']) &&
+        isValidId(data.id) && data.id == logId &&
+        isValidId(data.pharmacyId) && data.pharmacyId == pharmacyId &&
+        isValidId(data.ownerId) &&
+        data.timestamp is string && data.timestamp.size() >= 10 && data.timestamp.size() <= 40 &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 2 && data.userName.size() <= 120 &&
+        data.userRole in ['admin', 'seller'] &&
+        data.action is string && data.action.size() >= 3 && data.action.size() <= 40 &&
+        data.detail is string && data.detail.size() >= 3 && data.detail.size() <= 400 &&
+        data.createdAt is timestamp;
+    }
+
+    // Admin registry
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow write: if false;
+    }
+
+    // Split User Profiles (PII isolation)
+    match /users/{userId}/public/{docId} {
+      allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+      allow create: if isValidId(userId) && isValidId(docId) && isOwner(userId) &&
+        isValidUserPublic(incoming(), userId) &&
+        (incoming().role == 'seller' || isBootstrappedAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) && isValidId(docId) &&
+        isValidUserPublic(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isOwner(userId) && incoming().role == existing().role &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'roleTitle', 'cmpOrCode', 'updatedAt']))
+        );
+      allow delete: if false;
+    }
+
+    match /users/{userId}/private/{docId} {
+      allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+      allow create: if isValidId(userId) && isValidId(docId) && isOwner(userId) &&
+        isValidUserPrivate(incoming(), userId) &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin()) &&
+        isValidUserPrivate(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'pharmacyId', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Pharmacy Root Workspace
+    match /pharmacies/{pharmacyId} {
+      allow get: if isValidId(pharmacyId) && (isBootstrappedAdmin() || (isVerifiedUser() && resource.data.ownerId == request.auth.uid));
+      allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(pharmacyId) && isVerifiedUser() &&
+        isValidPharmacy(incoming(), pharmacyId) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(pharmacyId) && isPharmacyOwner(pharmacyId) &&
+        isValidPharmacy(incoming(), pharmacyId) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'ruc', 'address', 'receiptCounter', 'facturaCounter', 'queueCounter', 'restockCounter', 'updatedAt']);
+      allow delete: if false;
+
+      // Products Inventory
+      match /products/{productId} {
+        allow get: if isValidId(pharmacyId) && isValidId(productId) && isPharmacyOwner(pharmacyId);
+        allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isValidId(pharmacyId) && isValidId(productId) && isPharmacyOwner(pharmacyId) &&
+          isValidProduct(incoming(), pharmacyId, productId) &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(pharmacyId) && isValidId(productId) && isPharmacyOwner(pharmacyId) &&
+          isValidProduct(incoming(), pharmacyId, productId) &&
+          incoming().id == existing().id &&
+          incoming().pharmacyId == existing().pharmacyId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'batchNumber', 'expiryDate', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'activeIngredient', 'laboratory', 'category', 'presentation', 'batchNumber', 'expiryDate', 'stock', 'minStock', 'optimalStock', 'costPrice', 'salePrice', 'requiresPrescription', 'location', 'updatedAt'])
+          );
+        allow delete: if false;
+      }
+
+      // Customers Directory
+      match /customers/{customerId} {
+        allow get: if isValidId(pharmacyId) && isValidId(customerId) && isPharmacyOwner(pharmacyId);
+        allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isValidId(pharmacyId) && isValidId(customerId) && isPharmacyOwner(pharmacyId) &&
+          isValidCustomer(incoming(), pharmacyId, customerId) &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(pharmacyId) && isValidId(customerId) && isPharmacyOwner(pharmacyId) &&
+          isValidCustomer(incoming(), pharmacyId, customerId) &&
+          incoming().id == existing().id &&
+          incoming().pharmacyId == existing().pharmacyId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['visitsCount', 'totalSpent', 'lastVisit', 'updatedAt', 'phone', 'email', 'allergies', 'notes']);
+        allow delete: if false;
+      }
+
+      // Counter Queue
+      match /queue/{ticketId} {
+        allow get: if isValidId(pharmacyId) && isValidId(ticketId) && isPharmacyOwner(pharmacyId);
+        allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isValidId(pharmacyId) && isValidId(ticketId) && isPharmacyOwner(pharmacyId) &&
+          isValidQueueTicket(incoming(), pharmacyId, ticketId) &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().status == 'En espera' &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(pharmacyId) && isValidId(ticketId) && isPharmacyOwner(pharmacyId) &&
+          isValidQueueTicket(incoming(), pharmacyId, ticketId) &&
+          incoming().id == existing().id &&
+          incoming().pharmacyId == existing().pharmacyId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (existing().status != 'Atendido' || isAdmin()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'startedAt', 'completedAt', 'assignedUserName', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      // Sales Registry
+      match /sales/{saleId} {
+        allow get: if isValidId(pharmacyId) && isValidId(saleId) && isPharmacyOwner(pharmacyId);
+        allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isValidId(pharmacyId) && isValidId(saleId) && isPharmacyOwner(pharmacyId) &&
+          isValidSale(incoming(), pharmacyId, saleId) &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().status == 'Completada' &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(pharmacyId) && isValidId(saleId) && isPharmacyOwner(pharmacyId) &&
+          isValidSale(incoming(), pharmacyId, saleId) &&
+          incoming().id == existing().id &&
+          incoming().pharmacyId == existing().pharmacyId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (existing().status != 'Anulada' || isAdmin()) &&
+          incoming().status == 'Anulada' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'voidReason', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      // Restock Orders
+      match /restockOrders/{orderId} {
+        allow get: if isValidId(pharmacyId) && isValidId(orderId) && isPharmacyOwner(pharmacyId);
+        allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isValidId(pharmacyId) && isValidId(orderId) && isPharmacyOwner(pharmacyId) &&
+          isValidRestockOrder(incoming(), pharmacyId, orderId) &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().status == 'Pendiente' &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(pharmacyId) && isValidId(orderId) && isPharmacyOwner(pharmacyId) &&
+          isValidRestockOrder(incoming(), pharmacyId, orderId) &&
+          incoming().id == existing().id &&
+          incoming().pharmacyId == existing().pharmacyId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (existing().status != 'Recibida' || isAdmin()) &&
+          incoming().status == 'Recibida' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'items', 'receivedAt', 'receivedBy', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      // Immutable Audit Logs
+      match /auditLogs/{logId} {
+        allow get: if isValidId(pharmacyId) && isValidId(logId) && isPharmacyOwner(pharmacyId);
+        allow list: if isVerifiedUser() && (isBootstrappedAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isValidId(pharmacyId) && isValidId(logId) && isPharmacyOwner(pharmacyId) &&
+          isValidAuditLog(incoming(), pharmacyId, logId) &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
